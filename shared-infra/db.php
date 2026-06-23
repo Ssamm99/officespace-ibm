@@ -1,16 +1,23 @@
 <?php
 // /shared-infra/db.php
-header("Access-Control-Allow-Origin: *");
+// Compatible con MAMP (localhost) y Docker (mysql)
 
-$host = "127.0.0.1"; 
-$user = "root";
-$pass = "Mango10<";
-$dbname = "officespace_db";
-$port = 3306; 
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$port = getenv('DB_PORT') ?: '3306';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: 'Mango10<';
+$db   = getenv('DB_NAME') ?: 'officespace_db';
 
-$conn = mysqli_connect($host, $user, $pass, $dbname, $port);
+$conn = mysqli_connect($host, $user, $pass, $db, (int)$port);
 
 if (!$conn) {
-    die(json_encode(["status" => "error", "message" => "Error de conexión a la BD: " . mysqli_connect_error()]));
+    http_response_code(500);
+    echo json_encode([
+        "status"  => "error",
+        "message" => "Error de conexión a la base de datos: " . mysqli_connect_error()
+    ]);
+    exit();
 }
+
+mysqli_set_charset($conn, 'utf8mb4');
 ?>

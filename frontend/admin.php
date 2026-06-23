@@ -99,12 +99,14 @@
 
     <!-- GESTIÓN DE ESPACIOS -->
     <section>
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold text-slate-900">Gestión de Espacios</h2>
-        <button onclick="abrirModalEspacio()" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition">
-          + Nuevo Espacio
-        </button>
-      </div>
+      <div class="flex items-center gap-3">
+  <a href="analytics.php" class="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 transition">
+    📊 Ver Analytics
+  </a>
+  <button onclick="abrirModalEspacio()" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition">
+    + Nuevo Espacio
+  </button>
+</div>
 
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
