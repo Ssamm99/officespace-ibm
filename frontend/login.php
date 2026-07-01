@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Aplica el tema guardado antes de pintar (evita parpadeo) -->
+  <script>try{if(localStorage.getItem('officespace_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
+  <link rel="stylesheet" href="theme.css" />
   <title>Login — OfficeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -15,6 +18,8 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
+
+  <button data-theme-toggle class="theme-toggle-btn fixed top-4 right-4 z-50"></button>
 
   <section class="min-h-screen w-full flex items-center justify-center px-4 bg-gradient-to-b from-slate-100 to-slate-50">
     <div class="w-full max-w-md">
@@ -95,5 +100,6 @@
       }
     }
   </script>
+  <script src="theme.js"></script>
 </body>
 </html>

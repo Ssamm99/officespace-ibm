@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Aplica el tema guardado antes de pintar (evita parpadeo) -->
+  <script>try{if(localStorage.getItem('officespace_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="session.js"></script>
   <title>Dashboard — OfficeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -40,6 +44,7 @@
           <div class="flex items-center gap-3">
             <a id="btn-admin" href="admin.php" class="hidden rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition">Panel Admin</a>
             <a href="perfil.php" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">Mi Perfil</a>
+            <button data-theme-toggle class="theme-toggle-btn"></button>
             <div class="flex items-center gap-2.5 pl-2">
               <div class="h-9 w-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold" id="user-initials">--</div>
               <div class="hidden sm:block leading-tight">
@@ -185,6 +190,7 @@
             if (userData.rol === 'ADMINISTRADOR') {
                 document.getElementById('btn-admin').classList.remove('hidden');
             }
+            document.getElementById('filtro-fecha').min = fechaHoy();  // no permitir fechas pasadas
             cargarEspacios();
             cargarReservas(userData.id);
         }
@@ -249,6 +255,14 @@
         }
     }
 
+    // Fecha de hoy en formato YYYY-MM-DD según la zona horaria local
+    function fechaHoy() {
+        const d = new Date();
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    }
+
     function buscarEspacios() {
         const params = {
             fecha:       document.getElementById('filtro-fecha').value,
@@ -257,6 +271,20 @@
             tipo:        document.getElementById('filtro-tipo').value,
             capacidad:   document.getElementById('filtro-capacidad').value
         };
+
+        // Bloquear búsquedas en fechas pasadas: no tiene sentido reservar en un día que ya pasó
+        if (params.fecha && params.fecha < fechaHoy()) {
+            const grid = document.getElementById('workspace-grid');
+            grid.innerHTML = `
+                <div class="col-span-3 text-center py-16">
+                    <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p class="text-slate-500 font-semibold">Introduce una fecha válida.</p>
+                    <p class="text-slate-400 text-sm mt-1">Esa fecha ya pasó; no se pueden reservar espacios en días anteriores a hoy.</p>
+                </div>`;
+            Swal.fire({ icon: 'warning', title: 'Fecha no válida', text: 'La fecha seleccionada ya pasó. Elige hoy o una fecha futura.', confirmButtonColor: '#1f48db' });
+            return;
+        }
+
         if ((params.hora_inicio || params.hora_fin) && (!params.fecha || !params.hora_inicio || !params.hora_fin)) {
             Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Para buscar por horario necesitas fecha, hora inicio y hora fin.', confirmButtonColor: '#1f48db' });
             return;
@@ -345,7 +373,7 @@
         document.getElementById('modal-asistentes').max             = capacidad;
         document.getElementById('modal-notas').value                = '';
         document.getElementById('contador-notas').textContent       = '0';
-        const hoy = new Date().toISOString().split('T')[0];
+        const hoy = fechaHoy();
         document.getElementById('modal-fecha').value = hoy;
         document.getElementById('modal-fecha').min   = hoy;
         document.getElementById('modal-reserva').classList.remove('hidden');
@@ -376,10 +404,10 @@
             notas:       document.getElementById('modal-notas').value.trim()
         };
 
-        // Validación fecha pasada (cliente)
-        const hoy = new Date().toISOString().split('T')[0];
+        // Validación fecha pasada (cliente) — mismo criterio que el buscador
+        const hoy = fechaHoy();
         if (payload.fecha < hoy) {
-            Swal.fire({ icon: 'warning', title: 'Fecha inválida', text: 'No puedes reservar en fechas pasadas.', confirmButtonColor: '#1f48db' });
+            Swal.fire({ icon: 'warning', title: 'Fecha no válida', text: 'La fecha seleccionada ya pasó. Elige hoy o una fecha futura.', confirmButtonColor: '#1f48db' });
             btn.textContent = "Confirmar Reserva"; btn.disabled = false; return;
         }
 
@@ -419,5 +447,6 @@
         window.location.href = 'login.php';
     }
   </script>
+  <script src="theme.js"></script>
 </body>
 </html>

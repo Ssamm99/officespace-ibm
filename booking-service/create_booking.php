@@ -1,162 +1,138 @@
 <?php
 // /booking-service/create_booking.php
 
-// 1. Cabeceras CORS
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+require_once '../shared-infra/auth.php';
+aplicar_cors('POST, OPTIONS');
 
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
+$payload = requerir_jwt();   // exige JWT válido (firma + exp)
 
-// 2. Validación JWT
-$headers = getallheaders();
-$auth = $headers['Authorization'] ?? '';
-
-if (!str_starts_with($auth, 'Bearer ')) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "No autorizado. Token requerido."]);
-    exit();
-}
-
-$token  = substr($auth, 7);
-$partes = explode('.', $token);
-
-if (count($partes) !== 3) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Token inválido."]);
-    exit();
-}
-
-$payload = json_decode(base64_decode(str_pad(
-    strtr($partes[1], '-_', '+/'),
-    strlen($partes[1]) % 4, '=', STR_PAD_RIGHT
-)), true);
-
-if (!$payload || !isset($payload['id_usuario'])) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Token malformado."]);
-    exit();
-}
-
-// 3. Conexión a la base de datos
 require_once '../shared-infra/db.php';
 
-// 4. Recibir payload JSON
+// Recibir payload JSON
 $data = json_decode(file_get_contents("php://input"));
 
 if (
-    !empty($data->id_espacio) &&
-    !empty($data->id_usuario) &&
-    !empty($data->fecha) &&
-    !empty($data->hora_inicio) &&
-    !empty($data->hora_fin) &&
-    !empty($data->asistentes)
+    empty($data->id_espacio)  ||
+    empty($data->fecha)       ||
+    empty($data->hora_inicio) ||
+    empty($data->hora_fin)    ||
+    empty($data->asistentes)
 ) {
-    $id_espacio  = (int) $data->id_espacio;
-    $id_usuario  = (int) $data->id_usuario;
-    $fecha       = mysqli_real_escape_string($conn, $data->fecha);
-    $hora_inicio = mysqli_real_escape_string($conn, $data->hora_inicio);
-    $hora_fin    = mysqli_real_escape_string($conn, $data->hora_fin);
-    $asistentes  = (int) $data->asistentes;
-    // Notas es opcional
-    $notas       = mysqli_real_escape_string($conn, $data->notas ?? '');
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Faltan datos obligatorios para procesar la reserva."]);
+    exit();
+}
 
-    // VALIDACIÓN 1: Consistencia temporal
-    if (strtotime($hora_inicio) >= strtotime($hora_fin)) {
-        http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "La hora de fin debe ser posterior a la hora de inicio."]);
-        exit();
-    }
+$id_espacio  = (int) $data->id_espacio;
+// El dueño de la reserva SIEMPRE es el usuario autenticado del token (no se confía en el body).
+$id_usuario  = (int) $payload['id_usuario'];
+$fecha       = (string) $data->fecha;
+$hora_inicio = (string) $data->hora_inicio;
+$hora_fin    = (string) $data->hora_fin;
+$asistentes  = (int) $data->asistentes;
+$notas       = (string) ($data->notas ?? '');
 
-    // VALIDACIÓN 2: No reservar en fechas pasadas
-date_default_timezone_set('America/Mexico_City'); // ← MUEVE ESTA LÍNEA AQUÍ ARRIBA
+// ── VALIDACIONES DE NEGOCIO (antes de tocar la BD) ──────────────────────────
+date_default_timezone_set('America/Mexico_City');
+
+// 1. Consistencia temporal
+if (strtotime($hora_inicio) >= strtotime($hora_fin)) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "La hora de fin debe ser posterior a la hora de inicio."]);
+    exit();
+}
+
+// 2. No reservar en fechas pasadas
 $fecha_hoy = date('Y-m-d');
-
 if ($fecha < $fecha_hoy) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "No puedes crear reservas en fechas pasadas."]);
     exit();
 }
 
-// VALIDACIÓN 3: Si es hoy, la hora de inicio no debe haber pasado
-if ($fecha === $fecha_hoy) {
-    $hora_actual_segundos = strtotime(date('H:i'));
-    $hora_inicio_segundos = strtotime($hora_inicio);
-    if ($hora_inicio_segundos <= $hora_actual_segundos) {
-        $hora_actual_str = date('H:i');
-        http_response_code(400);
-        echo json_encode([
-            "status"  => "error",
-            "message" => "La hora de inicio ya pasó. Son las {$hora_actual_str}, elige un horario futuro."
-        ]);
-        exit();
-    }
+// 3. Si es hoy, la hora de inicio no debe haber pasado
+if ($fecha === $fecha_hoy && strtotime($hora_inicio) <= strtotime(date('H:i'))) {
+    $hora_actual_str = date('H:i');
+    http_response_code(400);
+    echo json_encode([
+        "status"  => "error",
+        "message" => "La hora de inicio ya pasó. Son las {$hora_actual_str}, elige un horario futuro."
+    ]);
+    exit();
 }
 
-    // VALIDACIÓN 4: Horario de oficina (07:00 - 21:00)
-    $apertura = strtotime('07:00');
-    $cierre   = strtotime('21:00');
-    if (strtotime($hora_inicio) < $apertura || strtotime($hora_fin) > $cierre) {
-        http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "Las reservas solo están permitidas en horario de oficina (07:00 - 21:00)."]);
-        exit();
-    }
+// 4. Horario de oficina (07:00 - 21:00)
+if (strtotime($hora_inicio) < strtotime('07:00') || strtotime($hora_fin) > strtotime('21:00')) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Las reservas solo están permitidas en horario de oficina (07:00 - 21:00)."]);
+    exit();
+}
 
-    // VALIDACIÓN 5: Capacidad del espacio
-    $query_capacidad = "SELECT capacidad FROM espacios WHERE id_espacio = $id_espacio AND activo = 1";
-    $res_capacidad   = mysqli_query($conn, $query_capacidad);
-    $espacio         = mysqli_fetch_assoc($res_capacidad);
+// ── SECCIÓN TRANSACCIONAL (evita condición de carrera / doble reserva) ───────
+// Bloqueamos la fila del espacio con SELECT ... FOR UPDATE: cualquier reserva
+// concurrente sobre el MISMO espacio queda serializada hasta el COMMIT.
+mysqli_begin_transaction($conn);
+
+try {
+    // 5. Capacidad del espacio (y bloqueo de la fila)
+    $stmt = mysqli_prepare($conn, "SELECT capacidad FROM espacios WHERE id_espacio = ? AND activo = 1 FOR UPDATE");
+    mysqli_stmt_bind_param($stmt, 'i', $id_espacio);
+    mysqli_stmt_execute($stmt);
+    $espacio = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 
     if (!$espacio) {
+        mysqli_rollback($conn);
         http_response_code(404);
         echo json_encode(["status" => "error", "message" => "El espacio no existe o no está disponible."]);
         exit();
     }
 
-    if ($asistentes > $espacio['capacidad']) {
+    if ($asistentes > (int) $espacio['capacidad']) {
+        mysqli_rollback($conn);
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "El número de asistentes excede la capacidad del espacio ({$espacio['capacidad']})."]);
         exit();
     }
 
-    // VALIDACIÓN 6: No-solapamiento
-    $query_colision = "
-        SELECT COUNT(*) as colisiones
-        FROM reservas
-        WHERE id_espacio = $id_espacio
-          AND fecha = '$fecha'
-          AND estatus = 'Activa'
-          AND hora_inicio < '$hora_fin'
-          AND hora_fin    > '$hora_inicio'
-    ";
-    $res_colision = mysqli_query($conn, $query_colision);
-    $fila         = mysqli_fetch_assoc($res_colision);
+    // 6. No-solapamiento (dentro de la transacción, ya con la fila bloqueada)
+    $col = mysqli_prepare(
+        $conn,
+        "SELECT COUNT(*) AS colisiones
+           FROM reservas
+          WHERE id_espacio = ?
+            AND fecha = ?
+            AND estatus = 'Activa'
+            AND hora_inicio < ?
+            AND hora_fin    > ?"
+    );
+    mysqli_stmt_bind_param($col, 'isss', $id_espacio, $fecha, $hora_fin, $hora_inicio);
+    mysqli_stmt_execute($col);
+    $fila = mysqli_fetch_assoc(mysqli_stmt_get_result($col));
 
-    if ($fila['colisiones'] > 0) {
+    if ((int) $fila['colisiones'] > 0) {
+        mysqli_rollback($conn);
         http_response_code(409);
         echo json_encode(["status" => "error", "message" => "El espacio ya está ocupado en ese horario."]);
         exit();
     }
 
-    // Todo válido — insertar con notas
-    $query_insert = "
-        INSERT INTO reservas (id_espacio, id_usuario, fecha, hora_inicio, hora_fin, asistentes, notas)
-        VALUES ($id_espacio, $id_usuario, '$fecha', '$hora_inicio', '$hora_fin', $asistentes, '$notas')
-    ";
+    // 7. Insertar
+    $ins = mysqli_prepare(
+        $conn,
+        "INSERT INTO reservas (id_espacio, id_usuario, fecha, hora_inicio, hora_fin, asistentes, notas)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    mysqli_stmt_bind_param($ins, 'iisssis', $id_espacio, $id_usuario, $fecha, $hora_inicio, $hora_fin, $asistentes, $notas);
+    mysqli_stmt_execute($ins);
 
-    if (mysqli_query($conn, $query_insert)) {
-        http_response_code(201);
-        echo json_encode(["status" => "success", "message" => "Reserva confirmada exitosamente."]);
-    } else {
-        http_response_code(500);
-        echo json_encode(["status" => "error", "message" => "Error interno al guardar la reserva."]);
-    }
+    mysqli_commit($conn);
 
-} else {
-    http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Faltan datos obligatorios para procesar la reserva."]);
+    http_response_code(201);
+    echo json_encode(["status" => "success", "message" => "Reserva confirmada exitosamente."]);
+
+} catch (\mysqli_sql_exception $e) {
+    mysqli_rollback($conn);
+    error_log('create_booking error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => "Error interno al guardar la reserva."]);
 }
-?>

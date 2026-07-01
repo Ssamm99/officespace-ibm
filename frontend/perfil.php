@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Aplica el tema guardado antes de pintar (evita parpadeo) -->
+  <script>try{if(localStorage.getItem('officespace_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="session.js"></script>
   <title>Mi Perfil — OfficeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -36,6 +40,7 @@
             ← Volver al Dashboard
           </a>
           <a id="btn-admin" href="admin.php" class="hidden rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition">Panel Admin</a>
+          <button data-theme-toggle class="theme-toggle-btn"></button>
           <div class="flex items-center gap-2.5 pl-2">
             <div class="h-9 w-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold" id="user-initials">--</div>
             <div class="hidden sm:block leading-tight">
@@ -272,5 +277,6 @@
         window.location.href = 'login.php';
     }
   </script>
+  <script src="theme.js"></script>
 </body>
 </html>

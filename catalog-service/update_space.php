@@ -1,42 +1,10 @@
 <?php
 // /catalog-service/update_space.php
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+require_once '../shared-infra/auth.php';
+aplicar_cors('POST, OPTIONS');
 
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') { exit(0); }
-
-// Validación JWT
-$headers = getallheaders();
-$auth = $headers['Authorization'] ?? '';
-
-if (!str_starts_with($auth, 'Bearer ')) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "No autorizado."]);
-    exit();
-}
-
-$token  = substr($auth, 7);
-$partes = explode('.', $token);
-
-if (count($partes) !== 3) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Token inválido."]);
-    exit();
-}
-
-$payload = json_decode(base64_decode(str_pad(
-    strtr($partes[1], '-_', '+/'),
-    strlen($partes[1]) % 4, '=', STR_PAD_RIGHT
-)), true);
-
-if (!$payload || ($payload['rol'] ?? '') !== 'ADMINISTRADOR') {
-    http_response_code(403);
-    echo json_encode(["status" => "error", "message" => "Solo administradores pueden editar espacios."]);
-    exit();
-}
+requerir_jwt('ADMINISTRADOR');
 
 require_once '../shared-infra/db.php';
 
@@ -49,37 +17,35 @@ if (empty($data->id_espacio) || empty($data->nombre) || empty($data->capacidad) 
 }
 
 $id_espacio = (int) $data->id_espacio;
-$nombre     = mysqli_real_escape_string($conn, $data->nombre);
-$tipo       = in_array($data->tipo, ['SALA', 'DESK']) ? $data->tipo : 'SALA';
+$nombre     = (string) $data->nombre;
+$tipo       = in_array($data->tipo ?? '', ['SALA', 'DESK'], true) ? $data->tipo : 'SALA';
 $capacidad  = (int) $data->capacidad;
-$piso       = mysqli_real_escape_string($conn, $data->piso);
-$recursos   = mysqli_real_escape_string($conn, $data->recursos ?? '');
+$piso       = (string) $data->piso;
+$recursos   = (string) ($data->recursos ?? '');
 $activo     = isset($data->activo) ? (int) $data->activo : 1;
 
-// Verificar que el espacio existe
-$check = mysqli_query($conn, "SELECT id_espacio FROM espacios WHERE id_espacio = $id_espacio");
-if (!$check || mysqli_num_rows($check) === 0) {
+// Verificar que el espacio existe (preparado)
+$chk = mysqli_prepare($conn, "SELECT id_espacio FROM espacios WHERE id_espacio = ?");
+mysqli_stmt_bind_param($chk, 'i', $id_espacio);
+mysqli_stmt_execute($chk);
+if (mysqli_stmt_get_result($chk)->num_rows === 0) {
     http_response_code(404);
     echo json_encode(["status" => "error", "message" => "Espacio no encontrado."]);
     exit();
 }
 
-$query = "
-    UPDATE espacios
-    SET nombre     = '$nombre',
-        tipo       = '$tipo',
-        capacidad  = $capacidad,
-        piso       = '$piso',
-        recursos   = '$recursos',
-        activo     = $activo
-    WHERE id_espacio = $id_espacio
-";
+$stmt = mysqli_prepare(
+    $conn,
+    "UPDATE espacios
+        SET nombre = ?, tipo = ?, capacidad = ?, piso = ?, recursos = ?, activo = ?
+      WHERE id_espacio = ?"
+);
+mysqli_stmt_bind_param($stmt, 'ssissii', $nombre, $tipo, $capacidad, $piso, $recursos, $activo, $id_espacio);
 
-if (mysqli_query($conn, $query)) {
+if (mysqli_stmt_execute($stmt)) {
     http_response_code(200);
     echo json_encode(["status" => "success", "message" => "Espacio actualizado exitosamente."]);
 } else {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "Error interno al actualizar el espacio."]);
 }
-?>

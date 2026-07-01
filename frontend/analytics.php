@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Aplica el tema guardado antes de pintar (evita parpadeo) -->
+  <script>try{if(localStorage.getItem('officespace_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="session.js"></script>
   <title>Analytics — OfficeSpace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -41,6 +45,7 @@
         <div class="flex items-center gap-3">
           <a href="admin.php" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">← Panel Admin</a>
           <a href="index.php" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">Dashboard</a>
+          <button data-theme-toggle class="theme-toggle-btn"></button>
           <div class="flex items-center gap-2 pl-2">
             <div class="h-9 w-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold" id="user-initials">AD</div>
             <div class="hidden sm:block leading-tight">
@@ -161,10 +166,23 @@
     const token    = localStorage.getItem('officespace_token');
     let charts     = {};
 
+    // Colores de las gráficas según el tema activo (claro/oscuro)
+    function isDark() { return document.documentElement.classList.contains('dark'); }
+    function chartTheme() {
+        return isDark()
+            ? { text: '#cbd5e1', grid: 'rgba(148,163,184,0.18)' }
+            : { text: '#475569', grid: '#f1f5f9' };
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('user-email').textContent    = userData.email || 'Admin';
         document.getElementById('user-initials').textContent = (userData.email || 'AD').substring(0, 2).toUpperCase();
         cargarAnalytics();
+
+        // Redibuja las gráficas cuando se cambia el tema (claro/oscuro)
+        new MutationObserver(() => {
+            if (Object.keys(charts).length) cargarAnalytics();
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     });
 
     function destroyChart(id) {
@@ -180,6 +198,11 @@
             if (data.status !== 'success') throw new Error(data.message);
 
             const { resumen, espacios_uso, horarios_pico, dias_semana } = data;
+
+            // Aplica los colores del tema actual a todas las gráficas
+            const ct = chartTheme();
+            Chart.defaults.color       = ct.text;
+            Chart.defaults.borderColor = ct.grid;
 
             // KPIs
             document.getElementById('kpi-total').textContent      = resumen.total_reservas;
@@ -215,7 +238,7 @@
                     plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
                     scales: {
                         x: { stacked: true, ticks: { font: { size: 11 } }, grid: { display: false } },
-                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } }
+                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: ct.grid } }
                     }
                 }
             });
@@ -263,7 +286,7 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { ticks: { font: { size: 11 } }, grid: { display: false } },
-                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } }
+                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: ct.grid } }
                     }
                 }
             });
@@ -290,7 +313,7 @@
                     },
                     scales: {
                         x: { ticks: { font: { size: 13, weight: '600' } }, grid: { display: false } },
-                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } }
+                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: ct.grid } }
                     }
                 }
             });
@@ -306,5 +329,6 @@
         window.location.href = 'login.php';
     }
   </script>
+  <script src="theme.js"></script>
 </body>
 </html>

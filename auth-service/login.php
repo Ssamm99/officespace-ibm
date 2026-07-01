@@ -1,72 +1,79 @@
 <?php
 // /auth-service/login.php
 
-// 1. CONFIGURACIÓN DE CORS (CRÍTICO PARA MICROSERVICIOS)
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+require_once '../shared-infra/auth.php';   // CORS + helpers JWT
+aplicar_cors('POST, OPTIONS');
 
-// Si es una petición OPTIONS (Pre-flight de los navegadores), salimos temprano
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
-}
-
-// 2. INCLUIR CONEXIÓN A BD
 require_once '../shared-infra/db.php';
 
-// 3. RECIBIR DATOS DEL FRONTEND (JSON)
+// Recibir datos del frontend (JSON)
 $data = json_decode(file_get_contents("php://input"));
 
-if (!empty($data->email) && !empty($data->password)) {
-    $email = mysqli_real_escape_string($conn, $data->email);
-    $password = mysqli_real_escape_string($conn, $data->password);
+if (empty($data->email) || empty($data->password)) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Faltan datos (email o password)"]);
+    exit();
+}
 
-    // 4. CONSULTA A LA BASE DE DATOS
-    $query = "SELECT id_usuario, email, rol FROM usuarios WHERE email = '$email' AND password = '$password' AND activo = 1";
-    $result = mysqli_query($conn, $query);
+$email    = (string) $data->email;
+$password = (string) $data->password;
 
-    if (mysqli_num_rows($result) == 1) {
-        $row = mysqli_fetch_assoc($result);
+// CONSULTA CON SENTENCIA PREPARADA (previene SQL injection)
+$stmt = mysqli_prepare(
+    $conn,
+    "SELECT id_usuario, email, password, rol FROM usuarios WHERE email = ? AND activo = 1"
+);
+mysqli_stmt_bind_param($stmt, 's', $email);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$row    = mysqli_fetch_assoc($result);
 
-        // 5. GENERACIÓN DE TOKEN JWT SIMPLE (Requisito de IBM)
-        $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
-        $payload = json_encode([
+// Verificación de credenciales con hash (bcrypt/argon2)
+$autenticado = false;
+if ($row) {
+    $hash = $row['password'];
+    if (password_verify($password, $hash)) {
+        $autenticado = true;
+        // Re-hash si el algoritmo/costo cambió
+        if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+            $nuevo = password_hash($password, PASSWORD_DEFAULT);
+            $up = mysqli_prepare($conn, "UPDATE usuarios SET password = ? WHERE id_usuario = ?");
+            mysqli_stmt_bind_param($up, 'si', $nuevo, $row['id_usuario']);
+            mysqli_stmt_execute($up);
+        }
+    } elseif (!str_starts_with((string)$hash, '$2') && hash_equals((string)$hash, $password)) {
+        // Compatibilidad con cuentas legadas en texto plano: migrar a hash al vuelo.
+        $autenticado = true;
+        $nuevo = password_hash($password, PASSWORD_DEFAULT);
+        $up = mysqli_prepare($conn, "UPDATE usuarios SET password = ? WHERE id_usuario = ?");
+        mysqli_stmt_bind_param($up, 'si', $nuevo, $row['id_usuario']);
+        mysqli_stmt_execute($up);
+    }
+}
+
+if (!$autenticado) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Credenciales incorrectas"]);
+    exit();
+}
+
+// GENERACIÓN DE TOKEN JWT FIRMADO (HS256)
+$jwt_token = generar_jwt([
     'id_usuario' => (int) $row['id_usuario'],
     'email'      => $row['email'],
     'rol'        => $row['rol'],
-    'exp'        => time() + (60 * 60 * 24)
+    'iat'        => time(),
+    'exp'        => time() + JWT_TTL,
 ]);
 
-        // Codificación Base64Url
-        $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
-        $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
-        
-        // Firma (Signature)
-        $secret = 'ibm_hackathon_2026_super_secret';
-        $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $secret, true);
-        $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
-        
-        $jwt_token = $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
-
-        // 6. RESPUESTA EXITOSA EN JSON
-        http_response_code(200);
-        echo json_encode([
-            "status" => "success",
-            "message" => "Login exitoso",
-            "token" => $jwt_token,
-            "user" => [
-                "id" => $row['id_usuario'],
-                "email" => $row['email'],
-                "rol" => $row['rol']
-            ]
-        ]);
-    } else {
-        http_response_code(401);
-        echo json_encode(["status" => "error", "message" => "Credenciales incorrectas"]);
-    }
-} else {
-    http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Faltan datos (email o password)"]);
-}
-?>
+http_response_code(200);
+echo json_encode([
+    "status"  => "success",
+    "message" => "Login exitoso",
+    "token"   => $jwt_token,
+    "user"    => [
+        "id"    => (int) $row['id_usuario'],
+        "email" => $row['email'],
+        "rol"   => $row['rol'],
+    ],
+]);

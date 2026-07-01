@@ -1,42 +1,11 @@
 <?php
 // /catalog-service/create_space.php
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+require_once '../shared-infra/auth.php';
+aplicar_cors('POST, OPTIONS');
 
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') { exit(0); }
-
-// Validación JWT
-$headers = getallheaders();
-$auth = $headers['Authorization'] ?? '';
-
-if (!str_starts_with($auth, 'Bearer ')) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "No autorizado."]);
-    exit();
-}
-
-$token  = substr($auth, 7);
-$partes = explode('.', $token);
-
-if (count($partes) !== 3) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Token inválido."]);
-    exit();
-}
-
-$payload = json_decode(base64_decode(str_pad(
-    strtr($partes[1], '-_', '+/'),
-    strlen($partes[1]) % 4, '=', STR_PAD_RIGHT
-)), true);
-
-if (!$payload || ($payload['rol'] ?? '') !== 'ADMINISTRADOR') {
-    http_response_code(403);
-    echo json_encode(["status" => "error", "message" => "Solo administradores pueden crear espacios."]);
-    exit();
-}
+// Requiere JWT válido con rol ADMINISTRADOR (firma + exp verificadas)
+requerir_jwt('ADMINISTRADOR');
 
 require_once '../shared-infra/db.php';
 
@@ -48,19 +17,20 @@ if (empty($data->nombre) || empty($data->tipo) || empty($data->capacidad) || emp
     exit();
 }
 
-$nombre    = mysqli_real_escape_string($conn, $data->nombre);
-$tipo      = in_array($data->tipo, ['SALA', 'DESK']) ? $data->tipo : 'SALA';
+$nombre    = (string) $data->nombre;
+$tipo      = in_array($data->tipo, ['SALA', 'DESK'], true) ? $data->tipo : 'SALA';
 $capacidad = (int) $data->capacidad;
-$piso      = mysqli_real_escape_string($conn, $data->piso);
-$recursos  = mysqli_real_escape_string($conn, $data->recursos ?? '');
+$piso      = (string) $data->piso;
+$recursos  = (string) ($data->recursos ?? '');
 $activo    = isset($data->activo) ? (int) $data->activo : 1;
 
-$query = "
-    INSERT INTO espacios (nombre, tipo, capacidad, piso, recursos, activo)
-    VALUES ('$nombre', '$tipo', $capacidad, '$piso', '$recursos', $activo)
-";
+$stmt = mysqli_prepare(
+    $conn,
+    "INSERT INTO espacios (nombre, tipo, capacidad, piso, recursos, activo) VALUES (?, ?, ?, ?, ?, ?)"
+);
+mysqli_stmt_bind_param($stmt, 'ssissi', $nombre, $tipo, $capacidad, $piso, $recursos, $activo);
 
-if (mysqli_query($conn, $query)) {
+if (mysqli_stmt_execute($stmt)) {
     http_response_code(201);
     echo json_encode([
         "status"     => "success",
@@ -71,4 +41,3 @@ if (mysqli_query($conn, $query)) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "Error interno al crear el espacio."]);
 }
-?>

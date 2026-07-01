@@ -1,0 +1,109 @@
+/* theme.css — Modo oscuro compartido por todas las páginas.
+   Se activa cuando <html> tiene la clase "dark" (la gestiona theme.js).
+   Sobrescribe las utilidades de Tailwind usadas en la app para no tener
+   que añadir variantes dark: a cada elemento del marcado. */
+
+/* Base */
+html.dark,
+html.dark body {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Neutraliza el degradado claro del login */
+html.dark .bg-gradient-to-b {
+  background-image: none !important;
+  background-color: #0f172a !important;
+}
+
+/* Superficies (tarjetas, headers, modales) */
+html.dark .bg-white,
+html.dark .bg-white\/90,
+html.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+html.dark .bg-slate-100 {
+  background-color: #334155 !important;
+}
+
+/* Texto */
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+html.dark .text-slate-400,
+html.dark .text-slate-300 {
+  color: #94a3b8 !important;
+}
+
+/* Bordes */
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #334155 !important;
+}
+
+/* Estados hover de fondos claros */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #334155 !important;
+}
+
+/* Campos de formulario */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+/* Iconos nativos (date/time) en claro sobre fondo oscuro */
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="number"] {
+  color-scheme: dark;
+}
+
+/* Chips/insignias de marca: un poco más tenues en oscuro */
+html.dark .bg-brand-50 { background-color: rgba(51, 102, 255, 0.15) !important; }
+html.dark .text-brand-700 { color: #8bb2ff !important; }
+html.dark .border-brand-100,
+html.dark .border-brand-200 { border-color: rgba(51, 102, 255, 0.35) !important; }
+
+/* Botón de cambio de tema */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: 0.5rem;
+  color: #64748b;
+  transition: background-color .2s ease, color .2s ease;
+}
+.theme-toggle-btn:hover { background-color: #f1f5f9; color: #1f48db; }
+html.dark .theme-toggle-btn { color: #cbd5e1; }
+html.dark .theme-toggle-btn:hover { background-color: #334155 !important; color: #8bb2ff; }
+
+/* SweetAlert en modo oscuro */
+html.dark .swal2-popup { background: #1e293b !important; color: #e2e8f0 !important; }
+html.dark .swal2-title,
+html.dark .swal2-html-container { color: #e2e8f0 !important; }
+
+/* Scrollbar */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #475569 !important;
+  border-color: #0f172a !important;
+}

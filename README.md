@@ -1,85 +1,171 @@
 # OfficeSpace — Gestión Híbrida Inteligente
 
-Sistema de reserva de espacios de trabajo desarrollado para el Hackathon IBM 2026.
-Permite a colaboradores buscar y reservar salas de juntas y escritorios, con un panel de administración completo para gestión de espacios.
+Sistema de reserva de espacios de trabajo desarrollado para el Hackathon IBM 2026. Permite a los colaboradores buscar y reservar salas de juntas y escritorios, e incluye un panel de administración para la gestión del catálogo de espacios y el análisis de ocupación.
+
+La aplicación está construida sobre una arquitectura de microservicios en PHP 8.3, con MySQL como almacén de datos y autenticación mediante JSON Web Tokens firmados.
+
+---
+
+## Vista General
+
+<!--
+  Coloca tus imágenes en la carpeta screenshots/ con EXACTAMENTE estos nombres
+  para que se muestren aquí automáticamente (formato .png):
+    login.png · dashboard.png · dark-mode.png · admin.png · analytics.png
+-->
+
+**Inicio de sesión**
+
+![Pantalla de inicio de sesión](screenshots/login.png)
+
+**Dashboard de reservas**
+
+![Dashboard de búsqueda y reserva de espacios](screenshots/dashboard.png)
+
+**Modo oscuro**
+
+![Interfaz en modo oscuro](screenshots/dark-mode.png)
+
+**Panel de administración**
+
+![Panel de administración de espacios](screenshots/admin.png)
+
+**Analítica de ocupación**
+
+![Dashboard de analítica con métricas de uso](screenshots/analytics.png)
 
 ---
 
 ## Tabla de Contenidos
 
 - [Requisitos Previos](#requisitos-previos)
+- [Configuración de Entorno](#configuración-de-entorno)
 - [Instalación y Arranque](#instalación-y-arranque)
+- [Apagado del Sistema](#apagado-del-sistema)
 - [Credenciales de Prueba](#credenciales-de-prueba)
 - [Arquitectura del Sistema](#arquitectura-del-sistema)
+- [Seguridad](#seguridad)
 - [Decisiones Técnicas](#decisiones-técnicas)
 - [Documentación de API](#documentación-de-api)
 - [Guía de Usuario](#guía-de-usuario)
+- [Estructura del Proyecto](#estructura-del-proyecto)
 
 ---
 
-## ⚙️ Requisitos Previos
+## Requisitos Previos
+
+El proyecto se ejecuta íntegramente en contenedores; no necesitas instalar PHP ni MySQL en tu equipo.
 
 | Herramienta | Versión | Notas |
 |---|---|---|
-| PHP | 8.3.x | Incluido en MAMP |
-| MySQL | 8.x | Incluido en MAMP |
-| MAMP | 6.x+ | Para macOS/Windows |
+| Docker | 24.x+ | Docker Desktop en macOS/Windows |
+| Docker Compose | v2+ | Incluido en Docker Desktop |
 | Navegador | Cualquier moderno | Chrome recomendado |
 
-> **Nota:** El proyecto utiliza servidores PHP integrados (`php -S`) en lugar de Docker para maximizar la velocidad de desarrollo durante el hackathon. Cada microservicio corre en su propio proceso y puerto independiente.
+---
+
+## Configuración de Entorno
+
+Los secretos y parámetros de conexión se gestionan mediante variables de entorno y **no se incluyen en el control de versiones**. Antes del primer arranque, crea tu archivo de configuración local a partir de la plantilla:
+
+```bash
+cp .env.example .env
+```
+
+A continuación, edita `.env` y define al menos los siguientes valores:
+
+| Variable | Descripción |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` | Parámetros de conexión a MySQL |
+| `JWT_SECRET` | Secreto para firmar los tokens. **Obligatorio.** Genera uno robusto, por ejemplo con `openssl rand -hex 32` |
+| `JWT_TTL` | Vigencia del token en segundos (por defecto 86400 = 24 h) |
+| `CORS_ORIGINS` | Lista de orígenes permitidos para CORS, separados por comas |
+
+El archivo `.env` está excluido en `.gitignore`. Nunca lo subas al repositorio.
 
 ---
 
-## 🚀 Instalación y Arranque (Vía Docker)
+## Instalación y Arranque
 
-Toda la arquitectura de microservicios y la base de datos están contenerizadas para un despliegue instantáneo.
+Toda la arquitectura —microservicios, base de datos y frontend— se levanta contenerizada con un único comando.
 
-### 1. Clonar el repositorio
-\`\`\`bash
-git clone https://github.com/tu-usuario/officespace-ibm.git
-cd officespace-ibm
-\`\`\`
+1. Clona el repositorio y entra en la carpeta:
 
-### 2. Levantar la Infraestructura
-Asegúrate de tener Docker y Docker Compose instalados, y ejecuta:
-\`\`\`bash
-docker-compose up -d --build
-\`\`\`
-*Nota: Este comando descargará las imágenes necesarias, compilará los microservicios instalando los drivers de MySQL nativos y ejecutará el script `init-db.sql` automáticamente para poblar la base de datos.*
+   ```bash
+   git clone https://github.com/tu-usuario/officespace-ibm.git
+   cd officespace-ibm
+   ```
 
-### 3. Acceder al Sistema
-Una vez que los contenedores estén en ejecución (`Started`), abre tu navegador web en las siguientes rutas:
+2. Crea tu archivo `.env` (ver [Configuración de Entorno](#configuración-de-entorno)).
 
-- **Aplicación (Frontend):** [http://localhost:8080/login.php](http://localhost:8080/login.php)
-- **Documentación API (Swagger):** [http://localhost:8080/api-docs.php](http://localhost:8080/api-docs.php)
+3. Construye y levanta los servicios en segundo plano:
 
-### 6. Acceder al sistema
+   ```bash
+   docker-compose up -d --build
+   ```
 
-Abre el navegador y ve a:
+   El comando descarga las imágenes necesarias, compila los microservicios instalando los drivers nativos de MySQL y, en el primer arranque, ejecuta `shared-infra/init-db.sql` para crear y poblar la base de datos.
 
-```
-http://localhost:8888/officespace-ibm/frontend/login.php
-```
+4. Verifica que los contenedores estén en ejecución:
 
-> ✅ **Verificación rápida:** Abre `http://localhost:8001/get_spaces.php` — debe devolver un JSON con los espacios registrados.
+   ```bash
+   docker ps
+   ```
+
+5. Accede a la aplicación:
+
+   - Aplicación (frontend): http://localhost:8080/login.php
+   - Documentación de API: http://localhost:8080/api-docs.php
+
+   Comprobación rápida del backend: `http://localhost:8001/get_spaces.php` debe devolver un JSON con los espacios registrados.
 
 ---
 
-## 🔐 Credenciales de Prueba
+## Apagado del Sistema
+
+### Docker
+
+Detener y eliminar los contenedores conservando la base de datos:
+
+```bash
+docker-compose down
+```
+
+Este comando preserva el volumen `mysql_data`, por lo que tus reservas y espacios siguen disponibles en el siguiente arranque.
+
+Para detener **y borrar también la base de datos** (vuelve al estado inicial con los datos de `init-db.sql`):
+
+```bash
+docker-compose down -v
+```
+
+Si solo quieres pausar sin eliminar los contenedores:
+
+```bash
+docker-compose stop
+```
+
+Después de apagar, puedes cerrar Docker Desktop con normalidad.
+
+---
+
+## Credenciales de Prueba
+
+Las contraseñas se almacenan como hash bcrypt. Las credenciales de demostración son:
 
 | Rol | Email | Contraseña |
 |---|---|---|
-| **Administrador** | admin@corporativoalpha.com | Admin123 |
-| **Colaborador** | carlos.mendez@corporativoalpha.com | User123 |
-| **Colaborador** | ana.torres@corporativoalpha.com | User123 |
+| Administrador | admin@corporativoalpha.com | Admin123 |
+| Colaborador | carlos.mendez@corporativoalpha.com | User123 |
+| Colaborador | ana.torres@corporativoalpha.com | User123 |
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## Arquitectura del Sistema
 
 ```mermaid
 graph TD
-    Browser["🌐 Navegador<br/>login.php · index.php · admin.php · perfil.php<br/>Tailwind CSS + Vanilla JS + SweetAlert2"]
+    Browser["Navegador<br/>login.php · index.php · admin.php · perfil.php<br/>Tailwind CSS + Vanilla JS + SweetAlert2"]
 
     Browser -->|"POST :8003/login.php"| Auth
     Browser -->|"GET  :8001/get_spaces.php"| Catalog
@@ -88,31 +174,35 @@ graph TD
     Browser -->|"GET  :8002/get_reservas_hoy.php"| Booking
 
     subgraph Microservicios
-        Auth["🔐 Auth Service<br/>Puerto 8003<br/>login.php"]
-        Catalog["📋 Catalog Service<br/>Puerto 8001<br/>get_spaces.php<br/>create_space.php<br/>update_space.php<br/>delete_space.php"]
-        Booking["📅 Booking Service<br/>Puerto 8002<br/>create_booking.php<br/>cancel_booking.php<br/>get_user_bookings.php<br/>get_all_user_bookings.php<br/>get_reservas_hoy.php"]
+        Auth["Auth Service<br/>Puerto 8003<br/>login.php"]
+        Catalog["Catalog Service<br/>Puerto 8001<br/>get_spaces.php<br/>create_space.php<br/>update_space.php<br/>delete_space.php"]
+        Booking["Booking Service<br/>Puerto 8002<br/>create_booking.php<br/>cancel_booking.php<br/>get_user_bookings.php<br/>get_all_user_bookings.php<br/>get_reservas_hoy.php<br/>get_analytics.php"]
     end
 
-    Auth --> DB
-    Catalog --> DB
-    Booking --> DB
-
-    DB[("🗄️ MySQL<br/>officespace_db<br/>Puerto 3306<br/>usuarios · espacios · reservas")]
+    Auth --> Shared
+    Catalog --> Shared
+    Booking --> Shared
 
     subgraph SharedInfra["shared-infra/"]
-        DB
+        Shared["config.php · auth.php · db.php"]
+        Shared --> DB
+        DB[("MySQL<br/>officespace_db<br/>usuarios · espacios · reservas")]
     end
 ```
 
+El módulo `shared-infra` centraliza la configuración (`config.php`), el middleware de autenticación y CORS (`auth.php`) y la conexión a la base de datos (`db.php`), evitando la duplicación de lógica entre servicios.
+
 ### Puertos del sistema
 
-| Servicio | Puerto | Descripción |
+| Servicio | Puerto (Docker) | Descripción |
 |---|---|---|
-| Frontend (Apache MAMP) | 8888 | Sirve los archivos PHP del frontend |
+| Frontend | 8080 | Sirve los archivos PHP del frontend |
 | Auth Service | 8003 | Autenticación y emisión de JWT |
 | Catalog Service | 8001 | Gestión del catálogo de espacios |
-| Booking Service | 8002 | Motor de reservas y validaciones |
-| MySQL | 3306 | Base de datos compartida |
+| Booking Service | 8002 | Motor de reservas, validaciones y analítica |
+| MySQL | 3307 → 3306 | Base de datos compartida |
+
+El frontend se publica en el puerto 8080 del host y MySQL se expone en el 3307 (mapeado al 3306 interno del contenedor).
 
 ### Esquema de Base de Datos
 
@@ -120,7 +210,7 @@ graph TD
 usuarios
 ├── id_usuario (PK, AUTO_INCREMENT)
 ├── email (UNIQUE)
-├── password
+├── password (hash bcrypt)
 ├── rol (ENUM: ADMINISTRADOR, COLABORADOR)
 └── activo (TINYINT)
 
@@ -148,60 +238,73 @@ reservas
 
 ---
 
-## 🧠 Decisiones Técnicas
+## Seguridad
 
-### ¿Por qué microservicios con base de datos compartida?
+El sistema aplica las siguientes medidas:
 
-Se adoptó una **arquitectura híbrida de microservicios con BD compartida** por las siguientes razones:
+- **Autenticación por JWT firmado.** Los tokens se firman con HMAC-SHA256 y un secreto de entorno. Cada servicio protegido **verifica la firma** y la expiración (`exp`) antes de confiar en el contenido del token, mediante una comparación en tiempo constante (`hash_equals`). Un token manipulado es rechazado.
+- **Control de acceso por roles (RBAC).** Los endpoints administrativos exigen el rol `ADMINISTRADOR`; la cancelación de reservas valida la propiedad del recurso o el rol de administrador.
+- **Sentencias preparadas.** Todas las consultas que reciben datos del cliente usan parámetros vinculados, eliminando el riesgo de inyección SQL.
+- **Contraseñas con hash.** Se almacenan con `password_hash` (bcrypt) y se verifican con `password_verify`, con re-hash automático cuando cambia el algoritmo o el coste.
+- **Secretos fuera del código.** Credenciales y secreto JWT se leen de variables de entorno (`.env`), excluido del repositorio.
+- **CORS restringido.** Las cabeceras de origen cruzado se limitan a una allowlist configurable en lugar de aceptar cualquier origen.
+- **Transacciones en operaciones críticas.** La creación de reservas se ejecuta dentro de una transacción con bloqueo de fila (`SELECT ... FOR UPDATE`), evitando la doble reserva por condiciones de carrera.
 
-1. **Separación de responsabilidades clara:** Cada servicio tiene un dominio bien definido — autenticación, catálogo y reservas — y se comunica con los otros únicamente a través de HTTP, nunca mediante llamadas directas a funciones.
+---
 
-2. **Velocidad de desarrollo en hackathon:** Una BD compartida elimina la complejidad de la sincronización entre bases de datos distribuidas (event sourcing, sagas), permitiendo enfocarse en la lógica de negocio.
+## Decisiones Técnicas
 
-3. **Despliegue independiente:** Cada servicio tiene su propio proceso y puerto, lo que permite reiniciarlo, escalarlo o modificarlo sin afectar a los demás.
+### Microservicios con base de datos compartida
 
-4. **Transacciones simples:** Al compartir la BD, validaciones críticas como el algoritmo de no-solapamiento de horarios pueden hacerse con una sola consulta SQL atómica, sin coordinación distribuida.
+Se adoptó una arquitectura híbrida de microservicios con base de datos compartida por las siguientes razones:
 
-### ¿Por qué PHP en lugar de Node.js?
+1. **Separación de responsabilidades.** Cada servicio tiene un dominio bien definido —autenticación, catálogo y reservas— y se comunica con los demás únicamente a través de HTTP.
 
-- **Stack dominado por el equipo:** PHP 8.3 con sus mejoras de rendimiento y tipado es el lenguaje con el que el equipo tiene mayor experiencia práctica.
-- **MAMP como entorno integrado:** Elimina la configuración de entorno y permite arrancar inmediatamente.
-- **Sin dependencias de npm:** Cero tiempo perdido en instalación de paquetes o problemas de versiones.
+2. **Velocidad de desarrollo.** Una base de datos compartida elimina la complejidad de la sincronización entre bases distribuidas (event sourcing, sagas), permitiendo concentrar el esfuerzo en la lógica de negocio.
+
+3. **Despliegue independiente.** Cada servicio tiene su propio proceso y puerto, lo que permite reiniciarlo o modificarlo sin afectar a los demás.
+
+4. **Transacciones simples.** Al compartir la base, validaciones críticas como el control de solapamiento de horarios se resuelven con una sola transacción SQL, sin coordinación distribuida.
+
+### Elección de PHP
+
+PHP 8.3 es el lenguaje con el que el equipo tiene mayor experiencia, ofrece mejoras notables de rendimiento y tipado, e integra de forma directa con las imágenes oficiales de Docker, reduciendo el tiempo de puesta en marcha.
 
 ### Algoritmo de no-solapamiento
 
-La validación de conflictos de horario usa la regla matemática de intersección de intervalos:
+La validación de conflictos de horario aplica la regla de intersección de intervalos:
 
 ```
-Nueva reserva choca si:
+Una nueva reserva choca si:
   hora_inicio_nueva < hora_fin_existente
   AND
   hora_fin_nueva > hora_inicio_existente
 ```
 
-Esta condición detecta todos los casos posibles: solapamiento parcial izquierdo, parcial derecho, contenido y envolvente.
+Esta condición cubre todos los casos: solapamiento parcial por la izquierda, parcial por la derecha, contenido y envolvente. La comprobación se ejecuta dentro de la transacción de creación para garantizar consistencia bajo concurrencia.
 
-### JWT artesanal (sin librerías)
+### Implementación del JWT
 
-Por requisito explícito del hackathon, el JWT se implementa manualmente con HMAC-SHA256:
+Por requisito del hackathon, el JWT se implementa sin librerías externas, con HMAC-SHA256:
 
 ```
 token = base64url(header) + "." + base64url(payload) + "." + base64url(firma)
-firma = HMAC-SHA256(header + "." + payload, secret)
+firma = HMAC-SHA256(header + "." + payload, JWT_SECRET)
 ```
 
-El payload incluye: `id_usuario`, `email`, `rol` y `exp` (expiración a 24 horas).
+El payload incluye `id_usuario`, `email`, `rol`, `iat` y `exp`. La emisión y la verificación residen en `shared-infra/auth.php` y son reutilizadas por todos los servicios.
 
 ---
 
-## 📡 Documentación de API
+## Documentación de API
 
-La documentación interactiva está disponible en: `http://localhost:8888/officespace-ibm/api-docs.php`
+La documentación interactiva está disponible en `http://localhost:8080/api-docs.php`.
 
 ### Auth Service — Puerto 8003
 
 #### POST /login.php
-Autenticar usuario y obtener token JWT.
+
+Autentica un usuario y devuelve un token JWT.
 
 ```bash
 curl -X POST http://localhost:8003/login.php \
@@ -212,7 +315,8 @@ curl -X POST http://localhost:8003/login.php \
   }'
 ```
 
-**Respuesta exitosa (200):**
+Respuesta exitosa (200):
+
 ```json
 {
   "status": "success",
@@ -225,7 +329,8 @@ curl -X POST http://localhost:8003/login.php \
 }
 ```
 
-**Respuesta fallida (401):**
+Respuesta fallida (401):
+
 ```json
 { "status": "error", "message": "Credenciales incorrectas" }
 ```
@@ -235,18 +340,19 @@ curl -X POST http://localhost:8003/login.php \
 ### Catalog Service — Puerto 8001
 
 #### GET /get_spaces.php
-Obtener espacios disponibles con filtros opcionales.
+
+Obtiene los espacios disponibles con filtros opcionales.
 
 ```bash
-# Todos los espacios
+# Todos los espacios activos
 curl http://localhost:8001/get_spaces.php
 
-# Filtrado por fecha, horario y tipo
+# Filtrado por fecha, horario, tipo y capacidad
 curl "http://localhost:8001/get_spaces.php?fecha=2026-06-25&hora_inicio=09:00&hora_fin=11:00&tipo=SALA&capacidad=4"
 
-# Admin: ver todos incluyendo inactivos
+# Incluir inactivos (requiere token de administrador)
 curl "http://localhost:8001/get_spaces.php?mostrar_inactivos=1" \
-  -H "Authorization: Bearer <TOKEN>"
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
 ```
 
 | Parámetro | Tipo | Descripción |
@@ -256,27 +362,10 @@ curl "http://localhost:8001/get_spaces.php?mostrar_inactivos=1" \
 | hora_fin | string (H:i) | Hora de fin |
 | tipo | SALA \| DESK | Tipo de espacio |
 | capacidad | integer | Capacidad mínima requerida |
-| mostrar_inactivos | 0 \| 1 | Solo admin |
+| mostrar_inactivos | 0 \| 1 | Solo administrador |
 
-**Respuesta (200):**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "id_espacio": 1,
-      "nombre": "Sala Creativa",
-      "tipo": "SALA",
-      "capacidad": 8,
-      "recursos": "Proyector, Pantalla 65, AC",
-      "piso": "Piso 2",
-      "activo": 1
-    }
-  ]
-}
-```
+#### POST /create_space.php — Administrador
 
-#### POST /create_space.php 🔒 Admin
 ```bash
 curl -X POST http://localhost:8001/create_space.php \
   -H "Content-Type: application/json" \
@@ -290,7 +379,8 @@ curl -X POST http://localhost:8001/create_space.php \
   }'
 ```
 
-#### POST /update_space.php 🔒 Admin
+#### POST /update_space.php — Administrador
+
 ```bash
 curl -X POST http://localhost:8001/update_space.php \
   -H "Content-Type: application/json" \
@@ -306,7 +396,8 @@ curl -X POST http://localhost:8001/update_space.php \
   }'
 ```
 
-#### POST /delete_space.php 🔒 Admin
+#### POST /delete_space.php — Administrador
+
 ```bash
 curl -X POST http://localhost:8001/delete_space.php \
   -H "Content-Type: application/json" \
@@ -318,8 +409,9 @@ curl -X POST http://localhost:8001/delete_space.php \
 
 ### Booking Service — Puerto 8002
 
-#### POST /create_booking.php 🔒
-Crear una reserva con todas las validaciones de negocio.
+#### POST /create_booking.php — Autenticado
+
+Crea una reserva aplicando todas las validaciones de negocio. El propietario de la reserva se toma del token, no del cuerpo de la petición.
 
 ```bash
 curl -X POST http://localhost:8002/create_booking.php \
@@ -327,7 +419,6 @@ curl -X POST http://localhost:8002/create_booking.php \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{
     "id_espacio": 1,
-    "id_usuario": 2,
     "fecha": "2026-06-25",
     "hora_inicio": "09:00",
     "hora_fin": "11:00",
@@ -336,34 +427,38 @@ curl -X POST http://localhost:8002/create_booking.php \
   }'
 ```
 
-**Respuestas posibles:**
+Respuestas posibles:
 
 | Código | Situación |
 |---|---|
 | 201 | Reserva creada exitosamente |
-| 400 | Fecha pasada, hora pasada, fuera de horario de oficina, o capacidad excedida |
-| 401 | Token ausente o inválido |
-| 409 | Solapamiento de horario con reserva existente |
+| 400 | Fecha pasada, hora pasada, fuera de horario de oficina o capacidad excedida |
+| 401 | Token ausente, inválido o expirado |
+| 404 | El espacio no existe o no está disponible |
+| 409 | Solapamiento de horario con una reserva existente |
 | 500 | Error interno del servidor |
 
-#### GET /get_user_bookings.php 🔒
-Obtener reservas activas del usuario autenticado.
+#### GET /get_user_bookings.php — Autenticado
+
+Reservas activas y futuras del usuario autenticado.
 
 ```bash
 curl http://localhost:8002/get_user_bookings.php \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-#### GET /get_all_user_bookings.php 🔒
-Historial completo de reservas (activas + canceladas) para la pantalla de perfil.
+#### GET /get_all_user_bookings.php — Autenticado
+
+Historial completo de reservas (activas y canceladas) para la pantalla de perfil.
 
 ```bash
 curl http://localhost:8002/get_all_user_bookings.php \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-#### POST /cancel_booking.php 🔒
-Cancelar una reserva futura.
+#### POST /cancel_booking.php — Autenticado
+
+Cancela una reserva futura. Solo el propietario o un administrador puede cancelarla.
 
 ```bash
 curl -X POST http://localhost:8002/cancel_booking.php \
@@ -372,24 +467,34 @@ curl -X POST http://localhost:8002/cancel_booking.php \
   -d '{ "id_reserva": 5 }'
 ```
 
-#### GET /get_reservas_hoy.php 🔒 Admin
-Dashboard de ocupación del día actual.
+#### GET /get_reservas_hoy.php — Administrador
+
+Reservas activas del día actual para el dashboard de ocupación.
 
 ```bash
 curl http://localhost:8002/get_reservas_hoy.php \
   -H "Authorization: Bearer <TOKEN_ADMIN>"
 ```
 
+#### GET /get_analytics.php — Administrador
+
+Métricas de ocupación: espacios más usados, horarios pico, tasa de cancelación y distribución por día de la semana.
+
+```bash
+curl http://localhost:8002/get_analytics.php \
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
+```
+
 ---
 
-### Códigos de error comunes
+### Códigos de estado comunes
 
 | Código HTTP | Significado |
 |---|---|
 | 200 | OK — operación exitosa |
 | 201 | Created — recurso creado |
 | 400 | Bad Request — datos inválidos o regla de negocio violada |
-| 401 | Unauthorized — token ausente o inválido |
+| 401 | Unauthorized — token ausente, inválido o expirado |
 | 403 | Forbidden — rol sin permisos suficientes |
 | 404 | Not Found — recurso no encontrado |
 | 409 | Conflict — solapamiento de horario |
@@ -397,79 +502,58 @@ curl http://localhost:8002/get_reservas_hoy.php \
 
 ---
 
-## 📖 Guía de Usuario
+## Guía de Usuario
 
-### Cómo hacer login
+### Inicio de sesión
 
-1. Abre `http://localhost:8888/officespace-ibm/frontend/login.php`
-2. Ingresa tu email corporativo y contraseña
-3. El sistema te redirige automáticamente según tu rol:
-   - **Administrador** → Dashboard con botón "Panel Admin" visible en el header
-   - **Colaborador** → Dashboard de búsqueda de espacios
+1. Abre la página de login.
+2. Ingresa tu email corporativo y contraseña.
+3. El sistema redirige según el rol:
+   - Administrador: dashboard con acceso al panel de administración.
+   - Colaborador: dashboard de búsqueda de espacios.
 
-Si las credenciales son incorrectas, aparece un mensaje de error en pantalla.
+Si las credenciales son incorrectas, se muestra un mensaje de error en pantalla.
 
----
+### Búsqueda y reserva de espacios
 
-### Cómo buscar y reservar un espacio
+1. **Buscar disponibilidad.** Selecciona fecha, hora de inicio y hora de fin; opcionalmente filtra por tipo y capacidad mínima, y ejecuta la búsqueda. Solo aparecen los espacios libres para ese horario.
+2. **Reservar.** Selecciona el espacio deseado, confirma fecha y horario, indica el número de asistentes y, opcionalmente, una nota. Confirma la reserva.
+3. **Consultar reservas.** En la barra lateral aparecen tus reservas activas; desde "Mi Perfil" puedes ver el historial completo.
 
-1. **Buscar disponibilidad:**
-   - En el dashboard principal, selecciona la **fecha**, **hora inicio** y **hora fin**
-   - Filtra opcionalmente por **tipo** (Sala / Escritorio) y **capacidad mínima**
-   - Haz clic en **Search Availability**
-   - Solo aparecen los espacios libres para ese horario
+Reglas del sistema:
 
-2. **Reservar:**
-   - Haz clic en **Seleccionar** en la tarjeta del espacio deseado
-   - En el modal, confirma la fecha y horario
-   - Ingresa el número de asistentes
-   - Opcionalmente agrega una nota o descripción de la reunión
-   - Haz clic en **Confirmar Reserva**
+- Las reservas solo se permiten en horario de oficina (07:00 – 21:00).
+- No se permiten reservas en fechas u horas pasadas.
+- No se puede reservar un espacio ya ocupado en ese horario.
+- No se puede exceder la capacidad del espacio.
 
-3. **Ver tus reservas:**
-   - En la barra lateral derecha aparecen tus reservas activas
-   - Haz clic en el badge verde **Activa** para cancelar una reserva
-   - Ve a **Mi Perfil** para ver el historial completo con filtros
+### Administración de espacios (rol Administrador)
 
-**Reglas del sistema:**
-- Solo se pueden hacer reservas en horario de oficina: **07:00 – 21:00**
-- No se permiten reservas en fechas u horas pasadas
-- No se puede reservar un espacio ya ocupado en ese horario
-- No se puede exceder la capacidad del espacio
+Desde el panel de administración:
+
+- **Dashboard de ocupación.** Muestra espacios ocupados frente a disponibles y la lista de reservas activas del día, con opción de cancelarlas.
+- **Gestión del catálogo.** Crear, editar, desactivar y eliminar espacios. La eliminación solo procede si el espacio no tiene reservas activas futuras; en caso contrario, conviene desactivarlo.
+- **Analítica.** Visualización de métricas de uso derivadas de los datos reales del sistema.
 
 ---
 
-### Cómo administrar espacios (rol Admin)
-
-1. Inicia sesión con una cuenta de **Administrador**
-2. Haz clic en **Panel Admin** en el header
-
-**Dashboard de ocupación:**
-- Ve cuántos espacios están ocupados hoy vs. disponibles
-- Consulta la tabla con todas las reservas activas del día
-- Cancela cualquier reserva directamente desde el dashboard
-
-**Gestión de espacios (CRUD):**
-- **Crear:** clic en **+ Nuevo Espacio**, llena el formulario y guarda
-- **Editar:** clic en **Editar** en la fila del espacio — se abre el mismo formulario con los datos actuales
-- **Desactivar:** en el formulario de edición, cambia el estado a "Inactivo" — el espacio deja de aparecer en búsquedas
-- **Eliminar:** clic en **Eliminar** — solo funciona si el espacio no tiene reservas activas futuras
-
----
-
-## 🗂️ Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 officespace-ibm/
 ├── auth-service/
+│   ├── Dockerfile
 │   └── login.php
 ├── booking-service/
+│   ├── Dockerfile
 │   ├── create_booking.php
 │   ├── cancel_booking.php
 │   ├── get_user_bookings.php
 │   ├── get_all_user_bookings.php
-│   └── get_reservas_hoy.php
+│   ├── get_reservas_hoy.php
+│   └── get_analytics.php
 ├── catalog-service/
+│   ├── Dockerfile
 │   ├── get_spaces.php
 │   ├── create_space.php
 │   ├── update_space.php
@@ -478,18 +562,28 @@ officespace-ibm/
 │   ├── login.php
 │   ├── index.php
 │   ├── admin.php
-│   └── perfil.php
+│   ├── analytics.php
+│   ├── perfil.php
+│   ├── api-docs.php        # Swagger UI (documentación interactiva)
+│   ├── openapi.yaml        # contrato OpenAPI 3
+│   ├── theme.css           # estilos del modo oscuro
+│   ├── theme.js            # interruptor de tema (persistente y sincronizado entre pestañas)
+│   └── session.js          # cierra sesión automáticamente ante un token inválido (401)
 ├── shared-infra/
+│   ├── config.php          # configuración y carga de variables de entorno
+│   ├── auth.php            # middleware: CORS + emisión/verificación de JWT
 │   ├── db.php
 │   └── init-db.sql
+├── .env.example
+├── .gitignore
 ├── docker-compose.yml
 └── README.md
 ```
 
 ---
 
-## 👥 Equipo
+## Equipo
 
-Desarrollado para el **Hackathon IBM 2026** — Escenario OfficeSpace: Gestión Híbrida Inteligente.
+Desarrollado para el Hackathon IBM 2026 — escenario OfficeSpace: Gestión Híbrida Inteligente.
 
-**Stack:** PHP 8.3 · MySQL · HTML5 · Tailwind CSS · Vanilla JS · SweetAlert2
+Stack: PHP 8.3 · MySQL · Docker · HTML5 · Tailwind CSS · Vanilla JS · SweetAlert2

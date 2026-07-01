@@ -1,4 +1,15 @@
-version: '3.8'
+# Los secretos se leen del archivo .env (no versionado). Ver .env.example.
+# Docker Compose carga automáticamente el .env del directorio del proyecto.
+
+x-service-env: &service-env
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_USER: root
+  DB_PASS: "${DB_PASS}"
+  DB_NAME: "${DB_NAME:-officespace_db}"
+  JWT_SECRET: "${JWT_SECRET}"
+  JWT_TTL: "${JWT_TTL:-86400}"
+  CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}"
 
 services:
 
@@ -7,15 +18,15 @@ services:
     container_name: officespace_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: Mango10<
-      MYSQL_DATABASE: officespace_db
+      MYSQL_ROOT_PASSWORD: "${DB_PASS}"
+      MYSQL_DATABASE: "${DB_NAME:-officespace_db}"
     ports:
       - "3307:3306"
     volumes:
       - ./shared-infra/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pMango10<"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASS}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -27,11 +38,7 @@ services:
     ports:
       - "8003:8003"
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASS: "Mango10<"
-      DB_NAME: officespace_db
+      <<: *service-env
     depends_on:
       mysql:
         condition: service_healthy
@@ -46,11 +53,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASS: "Mango10<"
-      DB_NAME: officespace_db
+      <<: *service-env
     depends_on:
       mysql:
         condition: service_healthy
@@ -65,11 +68,7 @@ services:
     ports:
       - "8002:8002"
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASS: "Mango10<"
-      DB_NAME: officespace_db
+      <<: *service-env
     depends_on:
       mysql:
         condition: service_healthy

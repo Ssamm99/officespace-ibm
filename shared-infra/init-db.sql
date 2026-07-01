@@ -12,10 +12,12 @@ CREATE TABLE usuarios (
     activo TINYINT(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO usuarios (email, password, rol) VALUES 
-('admin@corporativoalpha.com', 'Admin123', 'ADMINISTRADOR'),
-('carlos.mendez@corporativoalpha.com', 'User123', 'COLABORADOR'),
-('ana.torres@corporativoalpha.com', 'User123', 'COLABORADOR');
+-- Contraseñas almacenadas como hash bcrypt (password_hash / PASSWORD_BCRYPT).
+-- Credenciales de demo: admin => "Admin123", colaboradores => "User123".
+INSERT INTO usuarios (email, password, rol) VALUES
+('admin@corporativoalpha.com', '$2y$10$E/LU0VzoPSEMWv54yRlvIOlqcMzHVP3.uF1.8owRLmzZHGZ5CRuVK', 'ADMINISTRADOR'),
+('carlos.mendez@corporativoalpha.com', '$2y$10$CzuJPZYwqRnYMzeawvB1DONGn2vpdlEQarmOhSRIgWC6S6Wqawj.e', 'COLABORADOR'),
+('ana.torres@corporativoalpha.com', '$2y$10$CzuJPZYwqRnYMzeawvB1DONGn2vpdlEQarmOhSRIgWC6S6Wqawj.e', 'COLABORADOR');
 
 -- 3. Tabla de Espacios
 CREATE TABLE espacios (

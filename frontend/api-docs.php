@@ -1,8 +1,3 @@
-<?php
-// /frontend/api-docs.php
-// Swagger UI servido via CDN — sin instalación de dependencias
-header("Access-Control-Allow-Origin: *");
-?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
